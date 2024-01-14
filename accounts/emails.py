@@ -2,7 +2,6 @@ from django.core.mail import send_mail
 from uuid import uuid4
 from django.conf import settings
 from .models import User
-from .serializer import UserSerializer
 
 def send_uuid_email(email):
     subject= "Blockstak Website Registration token"

@@ -16,10 +16,9 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path,include
-
+from .views import *
 urlpatterns = [
-    path('admin/', admin.site.urls),
-    path('auth/',include('djoser.urls')),
-    path('auth/',include('djoser.urls.jwt')),
-    path('accounts/',include('accounts.urls'))
+    path('verify_account/',VerifyRegistrationAPI.as_view({'post':'update'})),
+    path('register/',RegisterAPI.as_view()),
+    path('login/',LoginAPI.as_view())
 ]

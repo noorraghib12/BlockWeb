@@ -1,10 +1,10 @@
-
+from rest_framework.response import Response
 from django.db.models import Q
-from models import *
+from .models import *
 from rest_framework import serializers
-from rest_framework_simplejwt import RefreshToken
+from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth.models import auth
-from emails import *
+from .emails import *
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -16,10 +16,11 @@ class UserSerializer(serializers.ModelSerializer):
 class RegisterSerializer(serializers.Serializer):
     username=serializers.CharField(max_length=200)
     email=serializers.EmailField()
-    password_init=serializers.CharField()
-    password_confirm=serializers.CharField()
+    password_init=serializers.CharField(max_length=200,write_only=True)
+    password_confirm=serializers.CharField(max_length=200,write_only=True)
     is_active=serializers.BooleanField(default=False)
     def validate(self,data):
+        print(data)
         if User.objects.filter(Q(username=data['username']) | Q(email=data['email'])).exists():
             raise serializers.ValidationError("There is already a user with the current email/username within the database. Please use a different username/email")
         elif data['password_init']!=data['password_confirm']:
@@ -28,28 +29,34 @@ class RegisterSerializer(serializers.Serializer):
             return data
         
     def create(self,validated_data):
-        validated_data['password']=validated_data['passowrd_confirm']
-        try:
-            user=User.objects.create_user(**validated_data)
-        except:
-            del validated_data['password_init'], validated_data['password_cofirm']
-            user=User.objects.create_user(**validated_data)
-        user.save()
-        send_uuid_email(user.email)
-        return validated_data
+        validated_data['password']=validated_data['password_confirm']
+        user=User.objects.create_user(
+            username=validated_data['username'],
+            password=validated_data['password_confirm'],
+            email=validated_data['email'],
+            is_active=validated_data['is_active'],
+            )
+        return user
+        
 
-
-class VerifyRegistration(serializers.Serializer):
-    user_email=serializers.EmailField()
-    auth_string=serializers.CharField()
-    
+class VerifyRegistration(serializers.ModelSerializer):
+    class Meta:
+        model=User 
+        fields=['email','email_verify_token']
     def validate(self,data):
-        user=User.objects.filter(email=data['user_email'])
+        user=User.objects.filter(email=data['email'])
         if not user.exists():
             return {'message':'User doesnt exist in database with provided email address'}
-        elif user.email_verify_token!=data['email_verify_token']:
+        elif user.first().email_verify_token!=data['email_verify_token']:
             return {'message':f'Incorrect UUID token has been provided for activiting account with email:{user.email}'}    
         return data
+    
+    def update(self,instance,validated_data):
+        instance.is_active=True
+        instance.save()
+        return Response({'message':f"Congrats {instance.username}, account activated!",'data':validated_data})
+
+
 
 
             
@@ -61,10 +68,10 @@ class LoginSerializer(serializers.Serializer):
     password=serializers.CharField()
 
 
-    def validate(self,data):
-        if not User.objects.filter(username=data['username']).exists():
+    def validate(self,instance,data):
+        if not instance:
             raise serializers.ValidationError(f"Sorry, user with username:{data['username']} doesnt exist")        
-        elif not User.objects.filter(username=data['username'])[0].is_active:
+        elif not instance.is_active:
             raise serializers.ValidationError(f"Sorry user {data['username']} hasn't been activated yet. Please use UUIID sent to registered email for verifying and activating account")
         else:
             return data
@@ -83,3 +90,4 @@ class LoginSerializer(serializers.Serializer):
                     }
                 }
             }
+    
