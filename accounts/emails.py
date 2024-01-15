@@ -14,3 +14,9 @@ def send_uuid_email(email):
     user_obj.save()
 
 
+def forgot_pass_email(email):
+    subject= "Blockstak Forgot Password Token"
+    auth_string=str(uuid4())
+    message = f"Token for password change confirmation: \n {auth_string}"
+    email_from=settings.EMAIL_HOST
+    send_mail(subject,message,email_from,[email])
